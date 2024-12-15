@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2>Quản Lý Phòng</h2>
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Danh Sách Phòng</span>
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addRoomModal">
+                    Thêm Phòng Mới
+                </button>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Mã Phòng</th>
+                            <th>Loại Phòng</th>
+                            <th>Hệ Số Phòng</th>
+                            <th>Trạng Thái</th>
+                            <th>Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for room in rooms %}
+                        <tr>
+                            <td>{{ room.room_number }}</td>
+                            <td>{{ room.room_type }}</td>
+                            <td>{{ room.price_per_night }}</td>
+                            <td>
+                                <span class="badge {% if room.status == 'AVAILABLE' %}bg-success{% elif room.status == 'OCCUPIED' %}bg-danger{% else %}bg-success{% endif %}">
+                                    {{ room.status }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{{ url_for('room_detail', room_id=room.id) }}" class="btn btn-sm btn-info" style="margin-right: 4px;border-radius: inherit;">Chi Tiết</a>
+                                    <a href="{{ url_for('edit_room', room_id=room.id) }}" class="btn btn-sm btn-warning" style="margin-right: 4px;border-radius: inherit;">Sửa</a>
+                                    <form action="{{ url_for('delete_room', room_id=room.id) }}" method="POST" style="display:inline;">
+                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Bạn có chắc chắn muốn xóa phòng này?');">Xóa</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Thêm Phòng Mới -->
+<div class="modal fade" id="addRoomModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Thêm Phòng Mới</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="{{ url_for('add_room') }}">
+                    <div class="mb-3">
+                        <label class="form-label">Mã Phòng</label>
+                        <input type="text" name="room_number" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Loại Phòng</label>
+                        <select name="room_type" class="form-select" id="room_type" onchange="updatePrice()">
+                            <option value="single">Phòng Đơn</option>
+                            <option value="double">Phòng Đôi</option>
+                            <option value="family">Phòng Gia Đình</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Hệ số</label>
+                        <input type="text" name="price" class="form-control" id="room_price" readonly>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Lưu Phòng</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Hàm cập nhật giá phòng theo loại phòng được chọn
+    function updatePrice() {
+        var roomType = document.getElementById('room_type').value;
+        var price = 0;
+
+        // Gán giá phòng dựa trên loại phòng
+        switch (roomType) {
+            case 'single':
+                price = 1; // Phòng Đơn
+                break;
+            case 'double':
+                price = 2; // Phòng Đôi
+                break;
+            case 'family':
+                price = 4; // Phòng Gia Đình
+                break;
+        }
+
+        // Cập nhật giá vào ô nhập
+        document.getElementById('room_price').value = price.toLocaleString('en-US'); // Định dạng giá
+    }
+
+    // Khởi động cho lần đầu tiên
+    document.addEventListener('DOMContentLoaded', (event) => {
+        updatePrice(); // Cập nhật giá khi trang được tải
+    });
+</script>
+{% endblock %}

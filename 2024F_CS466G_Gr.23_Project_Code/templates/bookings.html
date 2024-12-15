@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2>Quản Lý Đặt Phòng</h2>
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Danh Sách Đặt Phòng</span>
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addBookingModal">
+                    Đặt Phòng Mới
+                </button>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Mã Đặt Phòng</th>
+                            <th>Khách Hàng</th>
+                            <th>Phòng</th>
+                            <th>Ngày Nhận</th>
+                            <th>Trạng Thái</th>
+                            <th>Tổng Tiền</th>
+                            <th>Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for booking in bookings %}
+                        <tr>
+                            <td>{{ booking.id }}</td>
+                            <td>{{ booking.customer.full_name }}</td>
+                            <td>{{ booking.room.room_number }}</td>
+                            <td>{{ booking.check_in_date.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                <span class="badge 
+                                {% if booking.status == 'CONFIRMED' %}bg-primary
+                                {% elif booking.status == 'CHECKED_IN' %}bg-success
+                                {% elif booking.status == 'CANCELLED' %}bg-danger
+                                {% else %}bg-secondary
+                                {% endif %}">
+                                    {{ booking.status }}
+                                </span>
+                            </td>
+                            <td>{{ '{:,.0f}'.format(booking.total_price) }} VNĐ</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="#" class="btn btn-sm btn-info">Chi Tiết</a>
+                                    <a href="#" class="btn btn-sm btn-warning">Sửa</a>
+                                    <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#cancelBookingModal-{{ booking.id }}">
+                                        Hủy
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Modal Hủy Đặt Phòng -->
+                        <div class="modal fade" id="cancelBookingModal-{{ booking.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Xác Nhận Hủy Đặt Phòng</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        Bạn có chắc chắn muốn hủy booking cho phòng 
+                                        <strong>{{ booking.room.room_number }}</strong> không?
+                                    </div>
+                                    <div class="modal-footer">
+                                        <form method="POST" action="{{ url_for('cancel_booking', booking_id=booking.id) }}">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Không</button>
+                                            <button type="submit" class="btn btn-danger">Có, Hủy</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Đặt Phòng Mới -->
+<div class="modal fade" id="addBookingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Đặt Phòng Mới</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="{{ url_for('add_booking') }}" id="bookingForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Khách Hàng</label>
+                            <select class="form-select" name="customer_id" required>
+                                {% for customer in customers %}
+                                <option value="{{ customer.id }}">{{ customer.full_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phòng</label>
+                            <select class="form-select" name="room_id" id="room_id" onchange="updateRoomPrice()" required>
+                                {% for room in available_rooms %}
+                                <option value="{{ room.id }}" data-price="{{ room.price_per_night }}">{{ room.room_number }} - {{ room.room_type }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Ngày Nhận Phòng</label>
+                            <input type="date" class="form-control" name="check_in_date" id="check_in_date" onchange="calculateTotalDays()" required>
+                        </div>
+                        <div class="col-md-6 mb-3" id="checkout_container" style="display: none;">
+                            <label class="form-label">Ngày Trả Phòng</label>
+                            <input type="date" class="form-control" name="check_out_date" id="check_out_date" onchange="calculateTotalDays()" required>
+                        </div>
+                    </div>
+ 
+                    <!-- Lựa chọn kiểu đặt phòng (Giờ, Combo, Ngày) -->
+                    <div class="mb-3">
+                        <label class="form-label">Chọn Loại Đặt Phòng</label>
+                        <select class="form-select" id="booking_type" name="booking_type" onchange="updateBookingDetails()" required>
+                            <option value="">Chọn Loại</option>
+                            <option value="hour">Theo Giờ</option>
+                            <option value="combo">Combo Giờ</option>
+                            <option value="day">Theo Ngày</option>
+                        </select>
+                    </div>
+ 
+                    <!-- Ô nhập số giờ (nếu chọn "Theo Giờ") -->
+                    <div class="row" id="hours_input" style="display:none;">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Số Giờ</label>
+                            <input type="number" class="form-control" name="hours" id="hours" min="1" oninput="calculateTotalPrice()" required>
+                        </div>
+                    </div>
+ 
+                    <!-- Ô chọn combo (nếu chọn "Combo Giờ") -->
+                    <div class="row" id="combo_input" style="display:none;">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Combo Giờ</label>
+                            <select class="form-select" name="hour_combo" id="combo" onchange="updateComboInput()">
+                                <option value="">Chọn Combo</option>
+                                <option value="1h60k">1h - 60k</option>
+                                <option value="2h120k">2h - 120k</option>
+                                <option value="5h260k">5h - 260k</option>
+                            </select>
+                        </div>
+                    </div>
+ 
+                    <!-- Hiển thị tổng số ngày cư trú -->
+                    <div class="row" id="total_days_container" style="display: none;">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Tổng Số Ngày</label>
+                            <input type="number" class="form-control" name="total_days" id="total_days" readonly oninput="calculateTotalPrice()">
+                        </div>
+                    </div>
+ 
+                    <!-- Hiển thị tổng tiền -->
+                    <div class="mb-3">
+                        <label class="form-label">Tổng Tiền</label>
+                        <input type="text" class="form-control" name="total_price" id="total_price" readonly>
+                    </div>
+ 
+                    <button type="submit" class="btn btn-primary">Xác Nhận Đặt Phòng</button>
+                </form>
+            </div>
+        </div>
+    </div>
+ </div>
+
+<script>
+    var pricePerHour = 60000; // Giá thuê theo giờ
+    var pricePerDay = 450000; // Giá thuê theo ngày
+
+    // Hàm cập nhật giá phòng và hệ số khi chọn phòng
+    function updateRoomPrice() {
+        calculateTotalPrice(); // Tính lại tổng tiền khi chọn phòng
+    }
+
+    // Hàm cập nhật giao diện dựa trên lựa chọn loại đặt phòng
+    function updateBookingDetails() {
+        var bookingType = document.getElementById('booking_type').value;
+        var hoursInput = document.getElementById('hours_input');
+        var comboInput = document.getElementById('combo_input');
+        var checkoutContainer = document.getElementById('checkout_container');
+        var totalDaysContainer = document.getElementById('total_days_container');
+
+        // Ẩn tất cả các trường nhập liệu ban đầu
+        hoursInput.style.display = 'none';
+        comboInput.style.display = 'none';
+        checkoutContainer.style.display = 'none';
+        totalDaysContainer.style.display = 'none';
+
+        // Cập nhật trường nhập liệu theo loại đặt phòng
+        if (bookingType === 'hour') {
+            hoursInput.style.display = 'block'; // Hiển thị ô nhập số giờ
+        } else if (bookingType === 'combo') {
+            comboInput.style.display = 'block'; // Hiển thị ô chọn combo
+        } else if (bookingType === 'day') {
+            checkoutContainer.style.display = 'block'; // Hiển thị ô nhập ngày trả phòng
+            totalDaysContainer.style.display = 'block'; // Hiển thị tổng số ngày
+        }
+
+        calculateTotalPrice(); // Tính lại tổng tiền mỗi khi thay đổi loại đặt phòng
+    }
+
+    // Hàm tính tổng số ngày dựa trên ngày nhận và ngày trả
+    function calculateTotalDays() {
+        var checkInDate = document.getElementById('check_in_date').value;
+        var checkOutDate = document.getElementById('check_out_date').value;
+
+        if (checkInDate && checkOutDate) {
+            var inDate = new Date(checkInDate);
+            var outDate = new Date(checkOutDate);
+
+            inDate.setHours(0, 0, 0, 0);
+            outDate.setHours(0, 0, 0, 0);
+
+            var timeDifference = outDate - inDate;
+            var dayDifference = timeDifference / (1000 * 3600 * 24); // Chuyển đổi từ mili giây sang ngày
+            
+            if (dayDifference >= 0) {
+                document.getElementById('total_days').value = dayDifference;
+            } else {
+                alert("Ngày trả phòng phải lớn hơn hoặc bằng ngày nhận phòng.");
+            }
+        }
+        calculateTotalPrice(); // Tính lại tổng tiền
+    }
+
+    // Hàm tính số giờ từ combo
+    function updateComboInput() {
+        var combo = document.getElementById('combo').value;
+        var hours = 0;
+
+        switch (combo) {
+            case '1h60k':
+                hours = 1;
+                break;
+            case '2h120k':
+                hours = 2;
+                break;
+            case '5h260k':
+                hours = 5;
+                break;
+        }
+
+        document.getElementById('hours').value = hours; // Hiện thị số giờ tương ứng
+        calculateTotalPrice(); // Tính lại tổng tiền
+    }
+
+    // Hàm tính tổng tiền
+    function calculateTotalPrice() {
+        var bookingType = document.getElementById('booking_type').value;
+        var totalHours = document.getElementById('hours').value || 0;
+        var totalDays = document.getElementById('total_days').value || 0;
+        var totalPrice = 0;
+
+        // Lấy ID phòng để xác định hệ số
+        var roomSelect = document.getElementById('room_id');
+        var selectedOption = roomSelect.options[roomSelect.selectedIndex];
+        var roomMultiplier = 1; // Mặc định là 1
+
+        if (selectedOption) {
+            // Nhận biết loại phòng dựa trên tên
+            if (selectedOption.text.includes("single")) {
+                roomMultiplier = 1; // Hệ số cho phòng Đơn
+            } else if (selectedOption.text.includes("double")) {
+                roomMultiplier = 2; // Hệ số cho phòng Đôi
+            } else if (selectedOption.text.includes("family")) {
+                roomMultiplier = 4; // Hệ số cho phòng Gia Đình
+            }
+        }
+
+        if (bookingType === 'hour') {
+            totalPrice = totalHours * pricePerHour * roomMultiplier; // Tính tổng tiền theo giờ
+        } else if (bookingType === 'combo') {
+            var combo = document.getElementById('combo').value;
+            switch (combo) {
+                case '1h60k':
+                    totalPrice = 60000 * roomMultiplier; // giá theo combo 1 giờ với hệ số
+                    break;
+                case '2h120k':
+                    totalPrice = 120000 * roomMultiplier; // giá theo combo 2 giờ với hệ số
+                    break;
+                case '5h260k':
+                    totalPrice = 260000 * roomMultiplier; // giá theo combo 5 giờ với hệ số
+                    break;
+            }
+        } else if (bookingType === 'day') {
+            totalPrice = totalDays * pricePerDay * roomMultiplier; // Tính tổng theo ngày với hệ số
+        }
+
+        // Cập nhật tổng tiền vào ô nhập
+        document.getElementById('total_price').value = totalPrice // Định dạng hiển thị
+    }
+</script>
+
+{% endblock %}
